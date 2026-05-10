@@ -73,14 +73,23 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
     ay = aux;
   }
 
-  float y = ay;
-  for (int x = ax; x <= bx; x++) {
-    if (steep)
-      BMSetPixel(BMI, (int)(y+0.5f), x, color);
-    else
-      BMSetPixel(BMI, x, (int)(y+0.5f), color);
+  int dx = bx - ax;
+  int dy = by - ay;
+  int D  = 2*dy - dx;
+  int y = ay;
 
-    y += (by-ay) / (float)(bx-ax);
+  for (int x = ax; x < bx; x++) {
+    if (steep)
+      BMSetPixel(BMI, y, x, color);
+    else
+      BMSetPixel(BMI, x, y, color);
+    if (D > 0) {
+      y++;
+      D+=2 * (dy - dx);
+    } else {
+      D+= 2*dy;
+    }
   }
+
 }
 
