@@ -21,28 +21,28 @@ int main(void) {
   BMImage BMI = BMSet(64, 64);
   FILE *f = BMCreate();
   
-  int ax =  7, ay =  3;
-  int bx = 12, by = 37;
-  int cx = 62, cy = 53;
+  if (0){
+    int ax =  7, ay =  3;
+    int bx = 12, by = 37;
+    int cx = 62, cy = 53;
 
-  line(ax, ay, bx, by, &BMI, RED);
-  line(cx, cy, bx, by, &BMI, GREEN);
-  line(cx, cy, ax, ay, &BMI, YELLOW);
-  line(ax, ay, cx, cy, &BMI, BLUE);
+    line(ax, ay, bx, by, &BMI, RED);
+    line(cx, cy, bx, by, &BMI, GREEN);
+    line(cx, cy, ax, ay, &BMI, YELLOW);
+    line(ax, ay, cx, cy, &BMI, BLUE);
 
-  BMSetPixel(&BMI, ax, ay, WHITE);
-  BMSetPixel(&BMI, bx, by, WHITE);
-  BMSetPixel(&BMI, cx, cy, WHITE);
-  
-  //
-
-  // srand(time(NULL));
-  // for (int i = 0; i < (1<<24); i++) {
-  //     int ax = rand()%64, ay = rand()%64;
-  //     int bx = rand()%64, by = rand()%64;
-  //     uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
-  //     line(ax, ay, bx, by, &BMI, color);
-  // }
+    BMSetPixel(&BMI, ax, ay, WHITE);
+    BMSetPixel(&BMI, bx, by, WHITE);
+    BMSetPixel(&BMI, cx, cy, WHITE);
+  } else {
+    srand(time(NULL));
+    for (int i = 0; i < (1<<24); i++) {
+        int ax = rand()%64, ay = rand()%64;
+        int bx = rand()%64, by = rand()%64;
+        uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
+        line(ax, ay, bx, by, &BMI, color);
+    }
+  }
   
   BMWrite(&BMI, f);
   fclose(f);
