@@ -1,9 +1,7 @@
 #include <time.h>
 #include "bmpimage.h"
 #include "util.h"
-
-#define TRUE 1
-#define FALSE 0
+#include "obj.h"
 
 #define RED     0x00FF0000
 #define GREEN   0x0000FF00
@@ -24,15 +22,18 @@ int main(int argc, char *argv[]) {
     int ax =  7, ay =  3;
     int bx = 12, by = 37;
     int cx = 62, cy = 53;
-
-    line(ax, ay, bx, by, &BMI, RED);
-    line(cx, cy, bx, by, &BMI, GREEN);
-    line(cx, cy, ax, ay, &BMI, YELLOW);
-    line(ax, ay, cx, cy, &BMI, BLUE);
+    int dx = 52, dy = 27;
 
     BMSetPixel(&BMI, ax, ay, WHITE);
     BMSetPixel(&BMI, bx, by, WHITE);
     BMSetPixel(&BMI, cx, cy, WHITE);
+    BMSetPixel(&BMI, dx, dy, WHITE);
+
+    line(ax, ay, bx, by, &BMI, RED);
+    line(cx, cy, bx, by, &BMI, GREEN);
+    line(ax, ay, cx, cy, &BMI, BLUE);
+    line(bx, by, dx, dy, &BMI, YELLOW);
+
   } else {
     srand(time(NULL));
     for (int i = 0; i < (1<<24); i++) {
@@ -50,7 +51,6 @@ int main(int argc, char *argv[]) {
 }
 
 void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
-
   int steep = FALSE;
   if (absol(by, ay) > absol(bx, ax)) {
     steep = TRUE;
@@ -67,7 +67,6 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
     int aux = bx;
     bx = ax;
     ax = aux;
-
     aux = by;
     by = ay;
     ay = aux;
@@ -76,7 +75,14 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
   int dx = bx - ax;
   int dy = by - ay;
   int D  = 2*dy - dx;
-  int y = ay;
+  int y  = ay;
+  int yi = 1;
+
+  if (dy < 0) {
+   yi = -1;
+   dy = -dy;
+  }
+
 
   for (int x = ax; x < bx; x++) {
     if (steep)
@@ -84,12 +90,11 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
     else
       BMSetPixel(BMI, x, y, color);
     if (D > 0) {
-      y++;
+      y+=yi;
       D+=2 * (dy - dx);
     } else {
       D+= 2*dy;
     }
   }
-
 }
 
