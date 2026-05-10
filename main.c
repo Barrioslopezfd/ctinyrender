@@ -1,5 +1,6 @@
-#include "bmpimage.h"
 #include <time.h>
+#include "bmpimage.h"
+#include "util.h"
 
 #define TRUE 1
 #define FALSE 0
@@ -14,14 +15,12 @@
 typedef uint32_t BMColor;
 
 void line(int, int, int, int, BMImage*, BMColor);
-int absol(int, int);
-int rondo(float);
 
-int main(void) {
+int main(int argc, char *argv[]) {
   BMImage BMI = BMSet(64, 64);
   FILE *f = BMCreate();
   
-  if (0){
+  if (argc == 1){
     int ax =  7, ay =  3;
     int bx = 12, by = 37;
     int cx = 62, cy = 53;
@@ -74,32 +73,14 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
     ay = aux;
   }
 
-  if ((bx - ax) == 0 && (by - ay) == 0) return;
-
-  int bigy = by - ay;
-  int bigx = bx - ax;
-
-  for (int i = 0; i <= bigx; i++) {
-    int x = ax + i;
-    int y = ay + rondo(bigy * (i / (float)bigx));
-
+  float y = ay;
+  for (int x = ax; x <= bx; x++) {
     if (steep)
-      BMSetPixel(BMI, y, x, color);
+      BMSetPixel(BMI, (int)(y+0.5f), x, color);
     else
-      BMSetPixel(BMI, x, y, color);
+      BMSetPixel(BMI, x, (int)(y+0.5f), color);
+
+    y += (by-ay) / (float)(bx-ax);
   }
 }
 
-int absol(int a, int b){
-  int c = a - b;
-  if (c < 0) return c * -1;
-  return c;
-}
-
-int rondo(float x) { 
-  if ((x - (int)x) < .5) {
-    return (int)x; 
-  } else {
-    return (int)x + 1;
-  }
-}
