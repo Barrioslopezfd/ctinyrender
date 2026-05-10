@@ -1,4 +1,5 @@
 #include "bmpimage.h"
+#include <stdlib.h>
 
 
 BMImage BMSet(int width, int height) {

@@ -1,4 +1,4 @@
-#include <time.h>
+#include <stdlib.h>
 #include "bmpimage.h"
 #include "util.h"
 #include "obj.h"
@@ -13,44 +13,34 @@
 typedef uint32_t BMColor;
 
 void line(int, int, int, int, BMImage*, BMColor);
+void triangle(int, int, int, int, int, int, BMImage*, BMColor);
 
-int main(int argc, char *argv[]) {
-  BMImage BMI = BMSet(64, 64);
+int main(int argc, char *argv[])
+{
+  BMImage BMI = BMSet(1024, 1024);
   FILE *f = BMCreate();
   
-  if (argc == 1){
-    int ax =  7, ay =  3;
-    int bx = 12, by = 37;
-    int cx = 62, cy = 53;
-    int dx = 52, dy = 27;
+  OBJModel model = modelget();
 
-    BMSetPixel(&BMI, ax, ay, WHITE);
-    BMSetPixel(&BMI, bx, by, WHITE);
-    BMSetPixel(&BMI, cx, cy, WHITE);
-    BMSetPixel(&BMI, dx, dy, WHITE);
-
-    line(ax, ay, bx, by, &BMI, RED);
-    line(cx, cy, bx, by, &BMI, GREEN);
-    line(ax, ay, cx, cy, &BMI, BLUE);
-    line(bx, by, dx, dy, &BMI, YELLOW);
-
-  } else {
-    srand(time(NULL));
-    for (int i = 0; i < (1<<24); i++) {
-        int ax = rand()%64, ay = rand()%64;
-        int bx = rand()%64, by = rand()%64;
-        uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
-        line(ax, ay, bx, by, &BMI, color);
-    }
+  for (int i = 0; i < model.facec; i+=3) {
+    int ax = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1));
+    int ay = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1));
+    int bx = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1));
+    int by = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1));
+    int cx = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1));
+    int cy = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1));
+    
+    triangle(ax, ay, bx, by, cx, cy, &BMI, WHITE);
   }
-  
+
   BMWrite(&BMI, f);
   fclose(f);
   free(BMI.pixels);
   return 0;
 }
 
-void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
+void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) 
+{
   int steep = FALSE;
   if (absol(by, ay) > absol(bx, ax)) {
     steep = TRUE;
@@ -98,3 +88,9 @@ void line(int ax, int ay, int bx, int by, BMImage *BMI, BMColor color) {
   }
 }
 
+void triangle(int ax, int ay, int bx, int by, int cx, int cy, BMImage *BMI, BMColor color)
+{
+  line(ax, ay, bx, by, BMI, color);
+  line(bx, by, cx, cy, BMI, color);
+  line(cx, cy, ax, ay, BMI, color);
+}

@@ -1,3 +1,5 @@
 a.out
 bmpimage.bmp
 profile.json.gz
+.cache/
+compile_commands.json
