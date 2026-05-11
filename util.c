@@ -1,8 +1,7 @@
 
-int absol(int a, int b){
-  int c = a - b;
-  if (c < 0) return c * -1;
-  return c;
+int absol(int a){
+  if (a < 0) return a * -1;
+  return a;
 }
 
 int rondo(float x) { 
