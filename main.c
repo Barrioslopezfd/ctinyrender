@@ -12,11 +12,12 @@
 #define BLACK   0x00000000
 
 typedef uint32_t BMColor;
+typedef struct { int x; int y; } vec2;
 
-void linelow(int, int, int, int, BMImage*, BMColor);
-void linehigh(int, int, int, int, BMImage*, BMColor);
-void line(int, int, int, int, BMImage*, BMColor);
-void triangle(int, int, int, int, int, int, BMImage*, BMColor);
+void linelow(vec2, vec2, BMImage*, BMColor);
+void linehigh(vec2, vec2, BMImage*, BMColor);
+void line(vec2, vec2, BMImage*, BMColor);
+void triangle(vec2, vec2, vec2, BMImage*, BMColor);
 void modelrender(OBJModel, BMImage);
 
 int main(int argc, char *argv[])
@@ -25,107 +26,121 @@ int main(int argc, char *argv[])
   FILE *f = BMCreate();
   
   OBJModel model = modelget();
-
-  // modelrender(model, BMI);
   if (argc == 1) {
-    triangle(  7, 45, 35, 100, 45,  60, &BMI, RED);
-    triangle(120, 35, 90,   5, 45, 110, &BMI, WHITE);
-    triangle(115, 83, 80,  90, 85, 120, &BMI, GREEN);
+    vec2 v0; 
+    vec2 v1;
+    vec2 v2;
+    v0 = (vec2){ .x = 7,  .y = 45, };
+    v1 = (vec2){ .x = 35, .y = 100, };
+    v2 = (vec2){ .x = 45, .y = 60, };
+    triangle(v0, v1, v2, &BMI, RED);
+    v0 = (vec2){ .x = 120, .y = 35 };
+    v1 = (vec2){ .x = 90,  .y = 5 };
+    v2 = (vec2){ .x = 45,  .y = 110 };
+    triangle(v0, v1, v2, &BMI, WHITE);
+    v0 = (vec2){ .x = 115, .y = 83 };
+    v1 = (vec2){ .x = 80,  .y = 90 };
+    v2 = (vec2){ .x = 85,  .y = 120 };
+    triangle(v0, v1, v2, &BMI, GREEN);
   } else {
     srand(time(NULL));
     for (int i = 0; i < (1<<24); i++) {
-        int ax = rand()%64, ay = rand()%64;
-        int bx = rand()%64, by = rand()%64;
-        uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
-        line(ax, ay, bx, by, &BMI, color);
+      vec2 v0 = { .x = rand()%64, .y = rand()%64 };
+      vec2 v1 = { .x = rand()%64, .y = rand()%64 };
+      uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
+      line(v0, v1, &BMI, color);
     }
   }
-
   BMWrite(&BMI, f);
   fclose(f);
   free(BMI.pixels);
   return 0;
 }
 
-void linelow(int x0, int y0, int x1, int y1, BMImage *BMI, BMColor color) 
+void linelow(vec2 v0, vec2 v1, BMImage *BMI, BMColor color) 
 {
-    int dx = x1 - x0;
-    int dy = y1 - y0;
-    int yi = 1;
-    if (dy < 0) {
-        yi = -1;
-        dy = -dy;
-    }
-    int D = (2 * dy) - dx;
-    int y = y0;
-
-    for (int x = x0; x <= x1; x++) {
-        BMSetPixel(BMI, x, y, color);;
-        if (D > 0) {
-            y = y + yi;
-            D = D + (2 * (dy - dx));
-        } else {
-            D = D + 2*dy;
-        }
-    }
-}
-
-void linehigh(int x0, int y0, int x1, int y1, BMImage *BMI, BMColor color) 
-{
-    int dx = x1 - x0;
-    int dy = y1 - y0;
-    int xi = 1;
-    if (dx < 0) {
-        xi = -1;
-        dx = -dx;
-    }
-    int D = (2 * dx) - dy;
-    int x = x0;
-
-    for (int y = y0; y <= y1; y++) {
-        BMSetPixel(BMI, x, y, color);;
-        if (D > 0) {
-            x = x + xi;
-            D = D + (2 * (dx - dy));
-        } else {
-            D = D + 2*dx;
-        }
-    }
-}
-
-void line(int x0, int y0, int x1, int y1, BMImage *BMI, BMColor color) 
-{
-    if (absol(y1 - y0) < absol(x1 - x0)) {
-        if (x0 > x1)
-            linelow(x1, y1, x0, y0, BMI, color);
-        else
-            linelow(x0, y0, x1, y1, BMI, color);
+  int dx = v1.x - v0.x;
+  int dy = v1.y - v0.y;
+  int yi = 1;
+  if (dy < 0) {
+    yi = -1;
+    dy = -dy;
+  }
+  int D = (2 * dy) - dx;
+  int y = v0.y;
+  for (int x = v0.x; x <= v1.x; x++) {
+    BMSetPixel(BMI, x, y, color);
+    if (D > 0) {
+      y = y + yi;
+      D = D + (2 * (dy - dx));
     } else {
-        if (y0 > y1)
-            linehigh(x1, y1, x0, y0, BMI, color);
-        else
-            linehigh(x0, y0, x1, y1, BMI, color);
+      D = D + 2*dy;
     }
+  }
 }
 
-void triangle(int ax, int ay, int bx, int by, int cx, int cy, BMImage *BMI, BMColor color)
+void linehigh(vec2 v0, vec2 v1, BMImage *BMI, BMColor color) 
 {
-  line(ax, ay, bx, by, BMI, color);
-  line(bx, by, cx, cy, BMI, color);
-  line(cx, cy, ax, ay, BMI, color);
+  int dx = v1.x - v0.x;
+  int dy = v1.y - v0.y;
+  int xi = 1;
+  if (dx < 0) {
+    xi = -1;
+    dx = -dx;
+  }
+  int D = (2 * dx) - dy;
+  int x = v0.x;
+  for (int y = v0.y; y <= v1.y; y++) {
+    BMSetPixel(BMI, x, y, color);
+    if (D > 0) {
+      x = x + xi;
+      D = D + (2 * (dx - dy));
+    } else {
+      D = D + 2*dx;
+    }
+  }
+}
+
+void line(vec2 v0, vec2 v1, BMImage *BMI, BMColor color) 
+{
+  int ay = absol(v1.y - v0.y);
+  int ax = absol(v1.x - v0.x);
+  if (ay < ax) {
+    if (v0.x > v1.x)
+      linelow(v1, v0, BMI, color);
+    else
+      linelow(v0, v1, BMI, color);
+  } else {
+    if (v0.y > v1.y)
+      linehigh(v1, v0, BMI, color);
+    else
+      linehigh(v0, v1, BMI, color);
+  }
+}
+
+void triangle(vec2 v0, vec2 v1, vec2 v2, BMImage *BMI, BMColor color)
+{
+  line(v0, v1, BMI, color);
+  line(v1, v2, BMI, color);
+  line(v2, v0, BMI, color);
 }
 
 void modelrender(OBJModel model, BMImage BMI)
 {
-
   for (int i = 0; i < model.facec; i+=3) {
-    int ax = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1));
-    int ay = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1));
-    int bx = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1));
-    int by = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1));
-    int cx = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1));
-    int cy = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1));
-    
-    triangle(ax, ay, bx, by, cx, cy, &BMI, WHITE);
+    vec2 v0 = {
+      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1)),
+      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1)),
+    };
+    vec2 v1 = {
+      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1)),
+      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1)),
+    };
+    vec2 v2 = {
+      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1)),
+      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
+    };
+    triangle(v0, v1, v2, &BMI, WHITE);
   }
 }
+
