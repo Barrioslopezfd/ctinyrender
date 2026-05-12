@@ -6,4 +6,5 @@
 
 int absol(int);
 int rondo(float);
+void swap(int *, int *);
 #endif

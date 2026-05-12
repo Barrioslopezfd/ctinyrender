@@ -18,7 +18,8 @@ void linelow(vec2, vec2, BMImage*, BMColor);
 void linehigh(vec2, vec2, BMImage*, BMColor);
 void line(vec2, vec2, BMImage*, BMColor);
 void triangle(vec2, vec2, vec2, BMImage*, BMColor);
-void modelrender(OBJModel, BMImage);
+void modelrender(OBJModel, BMImage*);
+void sortbyY(vec2 *, vec2, vec2, vec2);
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +28,7 @@ int main(int argc, char *argv[])
   
   OBJModel model = modelget();
   if (argc == 1) {
+    // modelrender(model, &BMI);
     vec2 v0; 
     vec2 v1;
     vec2 v2;
@@ -61,8 +63,7 @@ void linelow(vec2 v0, vec2 v1, BMImage *BMI, BMColor color)
 {
   int dx = v1.x - v0.x;
   int dy = v1.y - v0.y;
-  int yi = 1;
-  if (dy < 0) {
+  int yi = 1; if (dy < 0) {
     yi = -1;
     dy = -dy;
   }
@@ -120,27 +121,93 @@ void line(vec2 v0, vec2 v1, BMImage *BMI, BMColor color)
 
 void triangle(vec2 v0, vec2 v1, vec2 v2, BMImage *BMI, BMColor color)
 {
-  line(v0, v1, BMI, color);
-  line(v1, v2, BMI, color);
-  line(v2, v0, BMI, color);
+  vec2 vecs[3];
+  sortbyY(vecs, v0, v1, v2);
+
+  if (vecs[1].y != vecs[0].y) {
+    for (int y = vecs[0].y; y <= vecs[1].y; y++) {
+      int x1 = vecs[0].x + ((vecs[2].x - vecs[0].x)*(y - vecs[0].y)) / (vecs[2].y - vecs[0].y);
+      int x2 = vecs[0].x + ((vecs[1].x - vecs[0].x)*(y - vecs[0].y)) / (vecs[1].y - vecs[0].y);
+      if ( x1 < x2 ) {
+        for ( int x = x1; x < x2; x++ ) {
+          BMSetPixel(BMI, x, y, color);
+        }
+      } else {
+        for ( int x = x2; x < x1; x++ ) {
+          BMSetPixel(BMI, x, y, color);
+        }
+      }
+    }
+  }
+
+  if (vecs[2].y != vecs[1].y) { 
+    for (int y = vecs[1].y; y <= vecs[2].y; y++) {
+      int x1 = vecs[0].x + ((vecs[2].x - vecs[0].x)*(y - vecs[0].y)) / (vecs[2].y - vecs[0].y);
+      int x2 = vecs[1].x + ((vecs[2].x - vecs[1].x)*(y - vecs[1].y)) / (vecs[2].y - vecs[1].y);
+      if ( x1 < x2 ) {
+        for ( int x = x1; x < x2; x++ ) {
+          BMSetPixel(BMI, x, y, color);
+        }
+      } else {
+        for ( int x = x2; x < x1; x++ ) {
+          BMSetPixel(BMI, x, y, color);
+        }
+      }
+    }
+  }
+  // line(v0, v1, BMI, BLACK);
+  // line(v1, v2, BMI, BLACK);
+  // line(v2, v0, BMI, BLACK);
 }
 
-void modelrender(OBJModel model, BMImage BMI)
+void modelrender(OBJModel model, BMImage *BMI)
 {
   for (int i = 0; i < model.facec; i+=3) {
     vec2 v0 = {
-      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1)),
-      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1)),
+      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1)),
+      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1)),
     };
     vec2 v1 = {
-      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1)),
-      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1)),
+      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1)),
+      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1)),
     };
     vec2 v2 = {
-      .x = rondo((float)BMI.BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1)),
-      .y = rondo((float)BMI.BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
+      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1)),
+      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
     };
-    triangle(v0, v1, v2, &BMI, WHITE);
+    triangle(v0, v1, v2, BMI, WHITE);
+  }
+}
+
+void sortbyY(vec2 *vecs, vec2 v0, vec2 v1, vec2 v2)
+{
+  if (v0.y < v1.y && v0.y < v2.y) {
+    vecs[0] = v0;
+    if ( v1.y < v2.y ) {
+      vecs[1] = v1;
+      vecs[2] = v2;
+    } else {
+      vecs[1] = v2;
+      vecs[2] = v1;
+    }
+  } else if ( v1.y < v0.y && v1.y < v2.y ) {
+    vecs[0] = v1;
+    if ( v0.y < v2.y ) {
+      vecs[1] = v0;
+      vecs[2] = v2;
+    } else {
+      vecs[1] = v2;
+      vecs[2] = v0;
+    }
+  } else {
+    vecs[0] = v2;
+    if ( v0.y < v1.y ) {
+      vecs[1] = v0;
+      vecs[2] = v1;
+    } else {
+      vecs[1] = v1;
+      vecs[2] = v0;
+    }
   }
 }
 
