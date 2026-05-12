@@ -13,11 +13,12 @@
 
 typedef uint32_t BMColor;
 typedef struct { int x; int y; } vec2;
+typedef struct { vec2 v0; vec2 v1; vec2 v2; } tri;
 
 void linelow(vec2, vec2, BMImage*, BMColor);
 void linehigh(vec2, vec2, BMImage*, BMColor);
 void line(vec2, vec2, BMImage*, BMColor);
-void triangle(vec2, vec2, vec2, BMImage*, BMColor);
+void triangle(tri, BMImage*, BMColor);
 void modelrender(OBJModel, BMImage*);
 void sortbyY(vec2 *, vec2, vec2, vec2);
 
@@ -29,21 +30,24 @@ int main(int argc, char *argv[])
   OBJModel model = modelget();
   if (argc == 1) {
     // modelrender(model, &BMI);
-    vec2 v0; 
-    vec2 v1;
-    vec2 v2;
-    v0 = (vec2){ .x = 7,  .y = 45, };
-    v1 = (vec2){ .x = 35, .y = 100, };
-    v2 = (vec2){ .x = 45, .y = 60, };
-    triangle(v0, v1, v2, &BMI, RED);
-    v0 = (vec2){ .x = 120, .y = 35 };
-    v1 = (vec2){ .x = 90,  .y = 5 };
-    v2 = (vec2){ .x = 45,  .y = 110 };
-    triangle(v0, v1, v2, &BMI, WHITE);
-    v0 = (vec2){ .x = 115, .y = 83 };
-    v1 = (vec2){ .x = 80,  .y = 90 };
-    v2 = (vec2){ .x = 85,  .y = 120 };
-    triangle(v0, v1, v2, &BMI, GREEN);
+    tri t0 = { .v0 = (vec2){ .x = 7,  .y = 45, },
+                    .v1 = (vec2){ .x = 35, .y = 100, },
+                    .v2 = (vec2){ .x = 45, .y = 60, },
+                  };
+    triangle(t0, &BMI, RED);
+
+    tri t1 = { .v0 = (vec2){ .x = 120, .y = 35 },
+                    .v1 = (vec2){ .x = 90,  .y = 5 },
+                    .v2 = (vec2){ .x = 45,  .y = 110 },
+                  };
+    triangle(t1, &BMI, WHITE);
+
+    tri t2 = { .v0 = (vec2){ .x = 115, .y = 83 },
+                    .v1 = (vec2){ .x = 80,  .y = 90 },
+                    .v2 = (vec2){ .x = 85,  .y = 120 },
+                  };
+    triangle(t2, &BMI, GREEN);
+
   } else {
     srand(time(NULL));
     for (int i = 0; i < (1<<24); i++) {
@@ -119,8 +123,12 @@ void line(vec2 v0, vec2 v1, BMImage *BMI, BMColor color)
   }
 }
 
-void triangle(vec2 v0, vec2 v1, vec2 v2, BMImage *BMI, BMColor color)
+void triangle(tri t, BMImage *BMI, BMColor color)
 {
+  vec2 v0 = t.v0;
+  vec2 v1 = t.v1;
+  vec2 v2 = t.v2;
+
   vec2 vecs[3];
   sortbyY(vecs, v0, v1, v2);
 
@@ -163,19 +171,21 @@ void triangle(vec2 v0, vec2 v1, vec2 v2, BMImage *BMI, BMColor color)
 void modelrender(OBJModel model, BMImage *BMI)
 {
   for (int i = 0; i < model.facec; i+=3) {
-    vec2 v0 = {
-      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1)),
-      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1)),
+    tri t = {
+      .v0 = {
+        .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i] - 1) * 3]+1)),
+        .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i] - 1) * 3 + 1]+1)),
+      },
+      .v1 = {
+        .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1)),
+        .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1)),
+      },
+      .v2 = {
+        .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1)),
+        .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
+      },
     };
-    vec2 v1 = {
-      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+1] - 1) * 3]+1)),
-      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+1] - 1) * 3 +1]+1)),
-    };
-    vec2 v2 = {
-      .x = rondo((float)BMI->BIH.BIWidth/2 * (model.vertices[(model.faces[i+2] - 1) * 3]+1)),
-      .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
-    };
-    triangle(v0, v1, v2, BMI, WHITE);
+    triangle(t, BMI, WHITE);
   }
 }
 
