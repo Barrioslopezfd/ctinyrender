@@ -14,13 +14,16 @@
 typedef uint32_t BMColor;
 typedef struct { int x; int y; } vec2;
 typedef struct { vec2 v0; vec2 v1; vec2 v2; } tri;
+typedef struct { vec2 v0; vec2 v1; } bbox;
 
 void linelow(vec2, vec2, BMImage*, BMColor);
 void linehigh(vec2, vec2, BMImage*, BMColor);
 void line(vec2, vec2, BMImage*, BMColor);
-void triangle(tri, BMImage*, BMColor);
+void triangle(tri, bbox, BMImage*, BMColor);
 void modelrender(OBJModel, BMImage*);
 void sortbyY(vec2 *, vec2, vec2, vec2);
+bbox getbbox(tri);
+void drawbbox(bbox, BMImage*, BMColor);
 
 int main(int argc, char *argv[])
 {
@@ -28,27 +31,37 @@ int main(int argc, char *argv[])
   FILE *f = BMCreate();
   
   OBJModel model = modelget();
+  bbox bb;
+
   if (argc == 1) {
-    // modelrender(model, &BMI);
-    tri t0 = { .v0 = (vec2){ .x = 7,  .y = 45, },
-                    .v1 = (vec2){ .x = 35, .y = 100, },
-                    .v2 = (vec2){ .x = 45, .y = 60, },
-                  };
-    triangle(t0, &BMI, RED);
+    tri t0 = {  .v0 = (vec2){ .x = 7,  .y = 45, },
+                .v1 = (vec2){ .x = 35, .y = 100, },
+                .v2 = (vec2){ .x = 45, .y = 60, },
+             };
+    bb = getbbox(t0);
+    drawbbox(bb, &BMI, RED);
+    triangle(t0, bb, &BMI, RED);
 
-    tri t1 = { .v0 = (vec2){ .x = 120, .y = 35 },
-                    .v1 = (vec2){ .x = 90,  .y = 5 },
-                    .v2 = (vec2){ .x = 45,  .y = 110 },
-                  };
-    triangle(t1, &BMI, WHITE);
+    tri t1 = {  .v0 = (vec2){ .x = 120, .y = 35 },
+                .v1 = (vec2){ .x = 90,  .y = 5 },
+                .v2 = (vec2){ .x = 45,  .y = 110 },
+             };
+    bb = getbbox(t1);
+    drawbbox(bb, &BMI, WHITE);
+    triangle(t1, bb, &BMI, WHITE);
 
-    tri t2 = { .v0 = (vec2){ .x = 115, .y = 83 },
-                    .v1 = (vec2){ .x = 80,  .y = 90 },
-                    .v2 = (vec2){ .x = 85,  .y = 120 },
-                  };
-    triangle(t2, &BMI, GREEN);
+    tri t2 = {  .v0 = (vec2){ .x = 115, .y = 83 },
+                .v1 = (vec2){ .x = 80,  .y = 90 },
+                .v2 = (vec2){ .x = 85,  .y = 120 },
+             };
+    bb = getbbox(t2);
+    drawbbox(bb, &BMI, GREEN);
+    triangle(t2, bb, &BMI, GREEN);
 
-  } else {
+  } else if (argc == 2 && (int)argv[1][0] == 'm') {
+    modelrender(model, &BMI);
+  } else if (argc == 2 && argv[1][0] == 't') {
+    printf("#argc=%d\nargv[1]=%s\n", argc, argv[1]);
     srand(time(NULL));
     for (int i = 0; i < (1<<24); i++) {
       vec2 v0 = { .x = rand()%64, .y = rand()%64 };
@@ -56,6 +69,8 @@ int main(int argc, char *argv[])
       uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
       line(v0, v1, &BMI, color);
     }
+  } else {
+    printf("Use either t or m for stress test or model render, no argument for triangles\n");
   }
   BMWrite(&BMI, f);
   fclose(f);
@@ -123,7 +138,7 @@ void line(vec2 v0, vec2 v1, BMImage *BMI, BMColor color)
   }
 }
 
-void triangle(tri t, BMImage *BMI, BMColor color)
+void triangle(tri t, bbox bbox, BMImage *BMI, BMColor color)
 {
   vec2 v0 = t.v0;
   vec2 v1 = t.v1;
@@ -163,9 +178,6 @@ void triangle(tri t, BMImage *BMI, BMColor color)
       }
     }
   }
-  // line(v0, v1, BMI, BLACK);
-  // line(v1, v2, BMI, BLACK);
-  // line(v2, v0, BMI, BLACK);
 }
 
 void modelrender(OBJModel model, BMImage *BMI)
@@ -185,7 +197,8 @@ void modelrender(OBJModel model, BMImage *BMI)
         .y = rondo((float)BMI->BIH.BIHeight/2 * (model.vertices[(model.faces[i+2] - 1) * 3 +1]+1)),
       },
     };
-    triangle(t, BMI, WHITE);
+    bbox bb = getbbox(t);
+    triangle(t, bb, BMI, WHITE);
   }
 }
 
@@ -221,3 +234,71 @@ void sortbyY(vec2 *vecs, vec2 v0, vec2 v1, vec2 v2)
   }
 }
 
+void sortbyX(vec2 *vecs, vec2 v0, vec2 v1, vec2 v2)
+{
+  if (v0.x < v1.x && v0.x < v2.x) {
+    vecs[0] = v0;
+    if ( v1.x < v2.x ) {
+      vecs[1] = v1;
+      vecs[2] = v2;
+    } else {
+      vecs[1] = v2;
+      vecs[2] = v1;
+    }
+  } else if ( v1.x < v0.x && v1.x < v2.x ) {
+    vecs[0] = v1;
+    if ( v0.x < v2.x ) {
+      vecs[1] = v0;
+      vecs[2] = v2;
+    } else {
+      vecs[1] = v2;
+      vecs[2] = v0;
+    }
+  } else {
+    vecs[0] = v2;
+    if ( v0.x < v1.x ) {
+      vecs[1] = v0;
+      vecs[2] = v1;
+    } else {
+      vecs[1] = v1;
+      vecs[2] = v0;
+    }
+  }
+}
+
+bbox getbbox(tri t)
+{
+  vec2 v0 = t.v0;
+  vec2 v1 = t.v1;
+  vec2 v2 = t.v2;
+
+  vec2 yvecs[3];
+  vec2 xvecs[3];
+  sortbyY(yvecs, v0, v1, v2);
+  sortbyX(xvecs, v0, v1, v2);
+
+  return (bbox){ .v0 = (vec2) { .x = xvecs[0].x, .y = yvecs[0].y }, (vec2) { .x = xvecs[2].x, .y = yvecs[2].y } };
+}
+
+void drawbbox(bbox bb, BMImage *BMI, BMColor color)
+{
+  /*
+   *    v2     v3
+   *    +-------+
+   *    #       #
+   *    #       #
+   *    #       #
+   *    +-------+
+   *    v0     v1
+   */
+  vec2 v0 = bb.v0;
+  vec2 v1 = (vec2) {.x = bb.v0.x, .y = bb.v1.y};;
+  vec2 v2 = (vec2) {.x = bb.v1.x, .y = bb.v0.y};
+  vec2 v3 = bb.v1;
+  
+  line(v0, v1, BMI, color);
+  line(v0, v2, BMI, color);
+  line(v3, v1, BMI, color);
+  line(v3, v2, BMI, color);
+  
+}
