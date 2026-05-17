@@ -38,7 +38,7 @@ typedef struct {
 } BMImage;
 
 BMImage BMSet(int, int);
-FILE *BMCreate(void);
+FILE *BMCreate(char *);
 void BMWrite(BMImage *, FILE *);
 void BMSetPixel(BMImage *, int, int, uint32_t);
 

@@ -40,8 +40,8 @@ BMImage BMSet(int width, int height) {
   return BMI;
 }
 
-FILE *BMCreate(void) {
-  return fopen("bmpimage.bmp", "wb");
+FILE *BMCreate(char *fname) {
+  return fopen(fname, "wb");
 };
 
 void BMWrite(BMImage *BMI, FILE *f){
@@ -51,5 +51,7 @@ void BMWrite(BMImage *BMI, FILE *f){
 };
 
 void BMSetPixel(BMImage *BMI, int x, int y, uint32_t color) {
+  if (x >= 0 && x < BMI->BIH.BIWidth && y >= 0 && y < BMI->BIH.BIHeight) {
     BMI->pixels[y * BMI->BIH.BIWidth + x] = color;
+  }
 }

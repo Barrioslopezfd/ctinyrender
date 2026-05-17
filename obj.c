@@ -5,16 +5,16 @@
 #include <unistd.h>
 #include "obj.h"
 
-OBJModel modelget(void)
+OBJModel modelget(char *objdir)
 {
   OBJModel model = {
     .vertices = mmap(NULL, sizeof(float) * 3 * 100000, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0),
     .faces = mmap(NULL, sizeof(int) * 3 * 100000, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0),
-    .vertexc = 0,
-    .facec = 0,
+    .nvertex = 0,
+    .nface = 0,
   };
 
-  FILE *f = fopen("obj/diablo3_pose/diablo3_pose.obj", "r");
+  FILE *f = fopen(objdir, "r");
   char line[256];
   int vc = 0;
   int fc = 0;
@@ -32,10 +32,8 @@ OBJModel modelget(void)
         break;
     }
   }
-  model.vertexc = vc;
-  model.facec = fc;
-  // printf("vertexc = %d\n", model.vertexc);
-  // printf("facec = %d\n", model.facec);
+  model.nvertex = vc;
+  model.nface = fc;
   fclose(f);
   return model;
 }

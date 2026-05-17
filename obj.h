@@ -4,10 +4,10 @@
 typedef struct {
     float *vertices;
     int *faces;
-    int vertexc;
-    int facec;
+    int nvertex;
+    int nface;
 } OBJModel;
 
-OBJModel modelget(void);
+OBJModel modelget(char *);
 
 #endif
