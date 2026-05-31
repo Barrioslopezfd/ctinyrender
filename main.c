@@ -1,6 +1,11 @@
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
 #include <omp.h>
-#include <time.h>
 #include "bmpimage.h"
 #include "util.h"
 #include "obj.h"
@@ -13,13 +18,22 @@
 #define WHITE   0x00FFFFFF
 #define BLACK   0x00000000
 
-#define WIDTH   1080
-#define HEIGHT  1080
-#define NBUFFER 2
+#define POSX        0
+#define POSY        0
+#define WIDTH       1980
+#define HEIGHT      1080
+#define BORDER_SIZE 2
+#define WHITE_COLOR 0xFFFFFF
+#define BLACK_COLOR 0x0F0F0F
+#define WHITE_COLOR 0xFFFFFF
+#define BLACK_COLOR 0x0F0F0F
+#define NBUFFER     2
 
 typedef uint32_t BMColor;
 typedef struct { vec3 v0; vec3 v1; vec3 v2; } tri;
 typedef struct { vec3 v0; vec3 v1; vec3 v2; vec3 v3; } bbox;
+
+typedef struct { uint32_t *pixel_buffer; uint32_t width; uint32_t height; } MPixmap;
 
 void linelow(vec3, vec3, BMImage*, BMColor);
 void linehigh(vec3, vec3, BMImage*, BMColor);
@@ -33,6 +47,77 @@ int32_t getarea(tri);
 
 int main(int argc, char *argv[])
 {
+  Display *display = XOpenDisplay(NULL);
+  if (display == NULL) {
+    printf("Cannot open display\n");
+    exit(1);
+  }
+
+  Window root = XDefaultRootWindow(display);
+  Window window = XCreateSimpleWindow(
+      display, 
+      root, 
+      POSX, 
+      POSY, 
+      WIDTH, 
+      HEIGHT, 
+      BORDER_SIZE,
+      WHITE_COLOR,
+      BLACK_COLOR);
+
+  Atom wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
+  XSetWMProtocols(display, window, &wm_delete_window, 1);
+
+  GC graphic_context = XCreateGC(display, window, 0, NULL);
+  XSetForeground(display, graphic_context, WHITE_COLOR);
+
+  XMapWindow(display, window);
+
+  MPixmap* pix = &(MPixmap){
+    .pixel_buffer = malloc(WIDTH * HEIGHT * 4),
+    .width = WIDTH,
+    .height = HEIGHT
+  };
+
+  int screen = DefaultScreen(display);
+  XImage *image = XCreateImage(display, 
+                               DefaultVisual(display, screen),
+                               24,           
+                               ZPixmap,      
+                               0,            
+                               (char *)pix->pixel_buffer, 
+                               WIDTH, HEIGHT, 
+                               32,           
+                               0);          
+
+  int quit = 0;
+  XSelectInput(display, window, StructureNotifyMask | KeyPressMask );
+  KeySym keysym;
+  static char key_return[32];
+  while(!quit) {
+    XQueryKeymap(display, key_return);
+    while (XPending(display)) {
+      XEvent event;
+      XNextEvent(display, &event);
+      switch (event.type) {
+        case ClientMessage:{
+          if ( (Atom)event.xclient.data.l[0] == wm_delete_window )
+            quit = 1;
+        } break;
+
+        case KeyPress: {
+          keysym = XLookupKeysym(&event.xkey , 0);
+          if (keysym == XK_Escape){
+            quit = 1;
+          }
+        } break;
+      }
+    }
+    XPutImage(display, window, graphic_context, image, 0, 0, 0, 0, WIDTH, HEIGHT);
+    usleep(16666);
+  }
+  XCloseDisplay(display);
+
   BMImage BMI = BMSet(WIDTH, HEIGHT);
   BMImage ZBF = BMSet(WIDTH, HEIGHT);
   BMImage *buffers[] = { &BMI, &ZBF };
@@ -41,37 +126,8 @@ int main(int argc, char *argv[])
   OBJModel model = modelget("obj/diablo3_pose/diablo3_pose.obj");
   bbox bb;
 
-  if (argc == 1) {
-    modelrender(model, buffers);
-  } else if (argc == 2 && (int)argv[1][0] == 't') {
-    tri t0 = {  .v0 = (vec3){ .x = 17, .y =  4, .z =   1 },
-      .v1 = (vec3){ .x = 55, .y = 39, .z =   1 },
-      .v2 = (vec3){ .x = 23, .y = 59, .z = 255 },
-    };
-    bb = getbbox(t0);
-    ZBuffer ZBuff = ZBSet(WIDTH, HEIGHT);
-    triangle(t0, bb, &BMI, ZBuff, RED);
-  } else if (argc == 2 && argv[1][0] == 's') {
-    
-    #pragma omp parallel
-    {
-        uint32_t seed = (uint32_t)time(NULL) ^ omp_get_thread_num();
+  modelrender(model, buffers);
 
-        #pragma omp for
-        for (int i = 0; i < (1<<24); i++) {
-            vec3 v0 = { .x = rand_r(&seed) % BMI.BIH.BIWidth, 
-                        .y = rand_r(&seed) % BMI.BIH.BIHeight };
-            vec3 v1 = { .x = rand_r(&seed) % BMI.BIH.BIWidth, 
-                        .y = rand_r(&seed) % BMI.BIH.BIHeight };
-            uint32_t color = (rand_r(&seed) % 255 << 16) | 
-                             (rand_r(&seed) % 255 << 8) | 
-                             (rand_r(&seed) % 255);
-            line(v0, v1, &BMI, color);
-        }
-    }
-} else {
-    printf("Use either t or m for stress test or model render, no argument for triangles\n");
-  }
   BMWrite(&BMI, bmpimage);
   BMWrite(&ZBF, zbuffer);
   fclose(bmpimage);
