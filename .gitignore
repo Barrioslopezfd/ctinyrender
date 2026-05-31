@@ -1,5 +1,6 @@
 a.out
-bmpimage.bmp
+*.bmp
+*.back
 diablo_wireframe_depth.bmp
 profile.json.gz
 .cache/

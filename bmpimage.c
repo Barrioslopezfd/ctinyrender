@@ -1,6 +1,8 @@
 #include "bmpimage.h"
+#include <stdio.h>
 #include <stdlib.h>
-
+#include <unistd.h>
+#include <sys/mman.h>
 
 BMImage BMSet(int width, int height) {
   BFHeader BFH = {
@@ -27,7 +29,7 @@ BMImage BMSet(int width, int height) {
 
   uint32_t *pixels = malloc(width * height * sizeof(uint32_t));
   if (!pixels) {
-    fprintf(stderr, "Malloc failed\n");
+    fprintf(stderr, "Malloc failed for pixels\n");
     exit(1);
   };
 
@@ -38,6 +40,33 @@ BMImage BMSet(int width, int height) {
   };
 
   return BMI;
+}
+
+ZBuffer ZBSet(int width, int height) {
+    long pagesize  = sysconf(_SC_PAGESIZE);
+    size_t bpx      = width * height * sizeof(int32_t);
+    size_t size = ((bpx + pagesize - 1) / pagesize) * pagesize;
+
+    ZBuffer ZBuff = mmap(
+        NULL,
+        size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1,
+        0
+        );
+
+    if (ZBuff == MAP_FAILED) {
+        perror("mmap failed for zbuffer");
+        exit(1);
+    }
+
+    int total_pixels = width * height;
+    for (int i = 0; i < total_pixels; i++) {
+        ZBuff[i] = 0;
+    }
+
+    return ZBuff;
 }
 
 FILE *BMCreate(char *fname) {

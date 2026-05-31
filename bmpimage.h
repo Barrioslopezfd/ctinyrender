@@ -37,7 +37,10 @@ typedef struct {
   uint32_t *pixels;
 } BMImage;
 
+typedef int32_t* ZBuffer;
+
 BMImage BMSet(int, int);
+ZBuffer ZBSet(int, int);
 FILE *BMCreate(char *);
 void BMWrite(BMImage *, FILE *);
 void BMSetPixel(BMImage *, int, int, uint32_t);

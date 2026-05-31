@@ -4,6 +4,7 @@
 #include "bmpimage.h"
 #include "util.h"
 #include "obj.h"
+#include "vector.h"
 
 #define RED     0x00FF0000
 #define GREEN   0x0000FF00
@@ -12,44 +13,45 @@
 #define WHITE   0x00FFFFFF
 #define BLACK   0x00000000
 
+#define WIDTH   1080
+#define HEIGHT  1080
+#define NBUFFER 2
+
 typedef uint32_t BMColor;
-typedef struct { int32_t x; int32_t y; int32_t z; } vec3;
 typedef struct { vec3 v0; vec3 v1; vec3 v2; } tri;
 typedef struct { vec3 v0; vec3 v1; vec3 v2; vec3 v3; } bbox;
 
 void linelow(vec3, vec3, BMImage*, BMColor);
 void linehigh(vec3, vec3, BMImage*, BMColor);
 void line(vec3, vec3, BMImage*, BMColor);
-void triangle(tri, bbox, BMImage*, BMColor);
-void modelrender(OBJModel, BMImage*);
+void triangle(tri, bbox, BMImage*, ZBuffer, BMColor);
+void modelrender(OBJModel, BMImage*[]);
 void sortbyY(vec3 *, vec3, vec3, vec3);
 void sortbyX(vec3 *, vec3, vec3, vec3);
 bbox getbbox(tri);
-void drawbbox(bbox, BMImage*, BMColor);
 int32_t getarea(tri);
 
 int main(int argc, char *argv[])
 {
-  BMImage BMI = BMSet(1920, 1920);
-  // FILE *f = BMCreate("diablo_wireframe_depth.bmp");
-  FILE *f = BMCreate("bmpimage.bmp");
-  // OBJModel model = modelget("obj/african_head/african_head.obj");
+  BMImage BMI = BMSet(WIDTH, HEIGHT);
+  BMImage ZBF = BMSet(WIDTH, HEIGHT);
+  BMImage *buffers[] = { &BMI, &ZBF };
+  FILE *zbuffer = BMCreate("zbuffer.bmp");
+  FILE *bmpimage = BMCreate("bmpimage.bmp");
   OBJModel model = modelget("obj/diablo3_pose/diablo3_pose.obj");
   bbox bb;
 
   if (argc == 1) {
-
+    modelrender(model, buffers);
+  } else if (argc == 2 && (int)argv[1][0] == 't') {
     tri t0 = {  .v0 = (vec3){ .x = 17, .y =  4, .z =   1 },
-                .v1 = (vec3){ .x = 55, .y = 39, .z =   1 },
-                .v2 = (vec3){ .x = 23, .y = 59, .z = 255 },
-             };
+      .v1 = (vec3){ .x = 55, .y = 39, .z =   1 },
+      .v2 = (vec3){ .x = 23, .y = 59, .z = 255 },
+    };
     bb = getbbox(t0);
-    triangle(t0, bb, &BMI, RED);
-
-
-  } else if (argc == 2 && (int)argv[1][0] == 'm') {
-    modelrender(model, &BMI);
-  } else if (argc == 2 && argv[1][0] == 't') {
+    ZBuffer ZBuff = ZBSet(WIDTH, HEIGHT);
+    triangle(t0, bb, &BMI, ZBuff, RED);
+  } else if (argc == 2 && argv[1][0] == 's') {
     
     #pragma omp parallel
     {
@@ -70,8 +72,9 @@ int main(int argc, char *argv[])
 } else {
     printf("Use either t or m for stress test or model render, no argument for triangles\n");
   }
-  BMWrite(&BMI, f);
-  fclose(f);
+  BMWrite(&BMI, bmpimage);
+  BMWrite(&ZBF, zbuffer);
+  fclose(bmpimage);
   free(BMI.pixels);
   return 0;
 }
@@ -136,7 +139,7 @@ void line(vec3 v0, vec3 v1, BMImage *BMI, BMColor color)
   }
 }
 
-void triangle(tri t, bbox bbox, BMImage *BMI, BMColor color)
+void triangle(tri t, bbox bbox, BMImage *BMI, ZBuffer ZBuff, BMColor color)
 {
   /*
    * SAREA = Sub-area
@@ -167,17 +170,11 @@ void triangle(tri t, bbox bbox, BMImage *BMI, BMColor color)
    *
    */
 
-
   int32_t sarea = getarea(t);
   if (sarea < 1) return;
   float tarea = 1/(float)sarea;
   float cx = (t.v0.x + t.v1.x + t.v2.x) / 3.0f;
   float cy = (t.v0.y + t.v1.y + t.v2.y) / 3.0f;
-  tri ti = (tri){ 
-    .v0 = (vec3){ .x = cx + (t.v0.x - cx) * 0.7f, .y = cy + (t.v0.y - cy) * 0.7f }, 
-    .v1 = (vec3){ .x = cx + (t.v1.x - cx) * 0.7f, .y = cy + (t.v1.y - cy) * 0.7f }, 
-    .v2 = (vec3){ .x = cx + (t.v2.x - cx) * 0.7f, .y = cy + (t.v2.y - cy) * 0.7f }, };
-  float tareai = 1/(float)getarea(ti);
 
   #pragma omp parallel for collapse(2)
   for (uint32_t y = bbox.v0.y; y <= bbox.v2.y; y++)
@@ -187,26 +184,24 @@ void triangle(tri t, bbox bbox, BMImage *BMI, BMColor color)
       tri t0 = (tri){ .v0 = (vec3){ .x = x, .y = y }, .v1 = t.v1, .v2 = t.v2 };
       tri t1 = (tri){ .v0 = t.v0, .v1 = (vec3){ .x = x, .y = y }, .v2 = t.v2 };
       tri t2 = (tri){ .v0 = t.v0, .v1 = t.v1, .v2 = (vec3){ .x = x, .y = y } };
-      
       float alpha = getarea(t0) * tarea;
       float beta  = getarea(t1) * tarea;
       float gamma = getarea(t2) * tarea;
 
-      tri ti0 = (tri){ .v0 = (vec3){ .x = x, .y = y }, .v1 = ti.v1, .v2 = ti.v2 };
-      tri ti1 = (tri){ .v0 = ti.v0, .v1 = (vec3){ .x = x, .y = y }, .v2 = ti.v2 };
-      tri ti2 = (tri){ .v0 = ti.v0, .v1 = ti.v1, .v2 = (vec3){ .x = x, .y = y } };
-
-      float alphai = getarea(ti0) * tareai;
-      float betai  = getarea(ti1) * tareai;
-      float gammai = getarea(ti2) * tareai;
-
       if (alpha < 0   || beta < 0   || gamma < 0) continue;
-      if (alphai >= 0 && betai >= 0 && gammai >= 0) continue;
-      uint8_t a = (uint8_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
-      uint8_t b = (uint8_t)(beta*t.v0.z   + gamma*t.v1.z  + alpha*t.v2.z);
-      uint8_t c = (uint8_t)(gamma*t.v0.z  + alpha*t.v1.z  + beta*t.v2.z);
-      uint32_t z = (a << 16) | (c << 8) | b;
-      BMSetPixel(BMI, x, y, z);
+      uint32_t z = color;
+      if (color == BLACK) {
+        uint8_t a = (uint8_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
+        uint8_t b = (uint8_t)(beta*t.v0.z   + gamma*t.v1.z  + alpha*t.v2.z);
+        uint8_t c = (uint8_t)(gamma*t.v0.z  + alpha*t.v1.z  + beta*t.v2.z);
+        z = (a << 16) | (c << 8) | b;
+      };
+      uint32_t depth = (uint32_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
+      uint32_t screen_index = y * BMI->BIH.BIWidth + x;
+      if (depth > ZBuff[screen_index]) {
+        ZBuff[screen_index] = depth;
+        BMSetPixel(BMI, x, y, z);
+      };
     };
   };
 }
@@ -218,8 +213,11 @@ int32_t getarea(tri t){
   return V01.x * V02.y - V01.y * V02.x;
 }
 
-void modelrender(OBJModel model, BMImage *BMI)
+void modelrender(OBJModel model, BMImage *buffers[])
 {
+  BMImage *BMI = buffers[0];
+  ZBuffer ZBuffColor = ZBSet(WIDTH, HEIGHT);
+  ZBuffer ZBuffBlack = ZBSet(WIDTH, HEIGHT);
   for (int i = 0; i < model.nface; i+=3) {
     tri t = {
       .v0 = {
@@ -240,7 +238,8 @@ void modelrender(OBJModel model, BMImage *BMI)
     };
     bbox bb = getbbox(t);
     uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
-    triangle(t, bb, BMI, color);
+    triangle(t, bb, buffers[0], ZBuffColor, color);
+    triangle(t, bb, buffers[1], ZBuffBlack, BLACK);
   }
 }
 
@@ -294,11 +293,3 @@ bbox getbbox(tri t)
   return (bbox){ v0, v1, v2, v3 };
 }
 
-void drawbbox(bbox bb, BMImage *BMI, BMColor color)
-{
-  line(bb.v0, bb.v1, BMI, color);
-  line(bb.v0, bb.v2, BMI, color);
-  line(bb.v3, bb.v1, BMI, color);
-  line(bb.v3, bb.v2, BMI, color);
-  
-}
