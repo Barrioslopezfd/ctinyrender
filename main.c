@@ -3,6 +3,7 @@
 #include <X11/Xutil.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <omp.h>
@@ -20,8 +21,8 @@
 
 #define POSX        0
 #define POSY        0
-#define WIDTH       1980
-#define HEIGHT      1080
+#define WIDTH       720
+#define HEIGHT      720
 #define BORDER_SIZE 2
 #define WHITE_COLOR 0xFFFFFF
 #define BLACK_COLOR 0x0F0F0F
@@ -91,8 +92,13 @@ int main(int argc, char *argv[])
                                0);          
 
   int quit = 0;
-  XSelectInput(display, window, StructureNotifyMask | KeyPressMask );
+  XSelectInput(display, window, StructureNotifyMask | KeyPressMask | ExposureMask );
   KeySym keysym;
+  OBJModel model = modelget("obj/diablo3_pose/diablo3_pose.obj");
+  BMImage BMI = BMSet(WIDTH, HEIGHT);
+  BMImage ZBF = BMSet(WIDTH, HEIGHT);
+  BMImage *buffers[] = { &BMI, &ZBF };
+  bbox bb;
   static char key_return[32];
   while(!quit) {
     XQueryKeymap(display, key_return);
@@ -100,38 +106,35 @@ int main(int argc, char *argv[])
       XEvent event;
       XNextEvent(display, &event);
       switch (event.type) {
-        case ClientMessage:{
-          if ( (Atom)event.xclient.data.l[0] == wm_delete_window )
-            quit = 1;
-        } break;
+        case Expose: {
+                        modelrender(model, buffers);
+                        for (int y = 0; y < HEIGHT; y++) {
+                          uint32_t *src_row = &ZBF.pixels[y * WIDTH];
+                          uint32_t *dst_row = &pix->pixel_buffer[(HEIGHT - 1 - y) * WIDTH];
+                          
+                          memcpy(dst_row, src_row, WIDTH * sizeof(uint32_t));
+                        }
+                     }
+        case ClientMessage: {
+                               if ( (Atom)event.xclient.data.l[0] == wm_delete_window )
+                                 quit = 1;
+                            } break;
 
         case KeyPress: {
-          keysym = XLookupKeysym(&event.xkey , 0);
-          if (keysym == XK_Escape){
-            quit = 1;
-          }
-        } break;
+                          keysym = XLookupKeysym(&event.xkey , 0);
+                          if (keysym == XK_Escape){
+                            quit = 1;
+                          }
+                        } break;
       }
     }
     XPutImage(display, window, graphic_context, image, 0, 0, 0, 0, WIDTH, HEIGHT);
     usleep(16666);
   }
-  XCloseDisplay(display);
 
-  BMImage BMI = BMSet(WIDTH, HEIGHT);
-  BMImage ZBF = BMSet(WIDTH, HEIGHT);
-  BMImage *buffers[] = { &BMI, &ZBF };
-  FILE *zbuffer = BMCreate("zbuffer.bmp");
-  FILE *bmpimage = BMCreate("bmpimage.bmp");
-  OBJModel model = modelget("obj/diablo3_pose/diablo3_pose.obj");
-  bbox bb;
-
-  modelrender(model, buffers);
-
-  BMWrite(&BMI, bmpimage);
-  BMWrite(&ZBF, zbuffer);
-  fclose(bmpimage);
   free(BMI.pixels);
+  free(ZBF.pixels);
+  XCloseDisplay(display);
   return 0;
 }
 
