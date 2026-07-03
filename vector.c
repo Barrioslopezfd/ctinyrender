@@ -60,3 +60,4 @@ vec4 vec4_mult(vec4 vecA, vec4 vecB) {
   int32_t z = vecA.x * vecB.y - vecA.y * vecB.x;
   return (vec4){ .x = x, .y = y, .z = z };
 }
+

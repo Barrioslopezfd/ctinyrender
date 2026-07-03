@@ -23,7 +23,11 @@ OBJModel modelget(char *objdir)
     switch (line[0]) {
       case 'v':
         if (line[1] != ' ') break;
-        sscanf(line, "v %f %f %f", &model.vertices[vc], &model.vertices[vc+1], &model.vertices[vc+2]);
+        float x, y ,z;
+        sscanf(line, "v %f %f %f", &x, &y, &z);
+        model.vertices[vc]      = x;
+        model.vertices[vc + 1]  = y;
+        model.vertices[vc + 2]  = z;
         vc+=3;
         break;
       case 'f':
