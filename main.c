@@ -38,7 +38,7 @@ typedef struct { vec3 v0; vec3 v1; vec3 v2; } tri;
 typedef struct { vec3 v0; vec3 v1; vec3 v2; vec3 v3; } bbox;
 typedef struct { float x; float y; float z; } vec3f;
 
-typedef struct { uint32_t *pixel_buffer; uint32_t width; uint32_t height; } MPixmap;
+typedef struct { int32_t *pixel_buffer; int32_t width; int32_t height; } MPixmap;
 typedef struct { int32_t *Buffer; size_t size; } ZBuffer;
 
 void linelow(vec3 v0, vec3 v1, MPixmap *pix, BMColor color);
@@ -57,6 +57,8 @@ bbox model_getbbox(OBJModel *model, MPixmap *pix);
 void vec3f_rot(vec3f *vec);
 void vec3f_perspec(vec3f *vec);
 void vec3f_proj(vec3 *vec, vec3f *pre_vec, MPixmap *pix);
+void vec3f_print(vec3f *vec);
+void vec3_print(vec3 *vec);
 
 int main(int argc, char *argv[])
 {
@@ -72,7 +74,7 @@ int main(int argc, char *argv[])
   int screen = DefaultScreen(display);
   XSetWindowAttributes attr;
   attr.background_pixmap  = 0L;
-  attr.event_mask         = KeyPressMask;
+  attr.event_mask         = KeyPressMask | ExposureMask;
 
   // Display*		/* display */,
   // Window		/* parent */,
@@ -135,10 +137,15 @@ int main(int argc, char *argv[])
   int quit = 0;
   KeySym keysym;
   OBJModel model = modelget("obj/african_head/african_head.obj");
-  model_getbbox(&model, pix); // not using rn
+  // for testing, i just comment diablio when i want african.
+  model = modelget("obj/diablo3_pose/diablo3_pose.obj");
+  // model = modelget("obj/A.obj");
+  // model_getbbox(&model, pix); // not using rn
   bbox bb;
   static char key_return[32];
   int a = 1;
+  modelrender(model, pix);
+  XPutImage(display, window, graphic_context, image, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   while(!quit) {
     XQueryKeymap(display, key_return);
     while (XPending(display)) {
@@ -156,14 +163,12 @@ int main(int argc, char *argv[])
             quit = 1;
           }
         } break;
+        case Expose: {
+          modelrender(model, pix);
+          XPutImage(display, window, graphic_context, image, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
       }
     }
-    
-    if (a) {
-      modelrender(model, pix);
-      XPutImage(display, window, graphic_context, image, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    }
-    a = 0;
     usleep(16666);
   }
 
@@ -262,15 +267,18 @@ void triangle(tri t, bbox bbox, MPixmap* pix, ZBuffer ZBuff, BMColor color)
    *
    */
 
+  // TODO: clear memory at the start of each call
+  // currently it breaks the mouth triangles, not sure why.
+  // memset(ZBuff.Buffer, 0, ZBuff.size);
   int32_t sarea = getarea(t);
   if (sarea < 1) return;
   float tarea = 1/(float)sarea;
   float cx = (t.v0.x + t.v1.x + t.v2.x) / 3.0f;
   float cy = (t.v0.y + t.v1.y + t.v2.y) / 3.0f;
 
-  for (uint32_t y = bbox.v0.y; y <= bbox.v2.y; y++)
+  for (int32_t y = bbox.v0.y; y <= bbox.v2.y; y++)
   {
-    for (uint32_t x = bbox.v0.x; x <= bbox.v1.x; x++)
+    for (int32_t x = bbox.v0.x; x <= bbox.v1.x; x++)
     {
       tri t0 = (tri){ .v0 = (vec3){ .x = x, .y = y }, .v1 = t.v1, .v2 = t.v2 };
       tri t1 = (tri){ .v0 = t.v0, .v1 = (vec3){ .x = x, .y = y }, .v2 = t.v2 };
@@ -280,14 +288,15 @@ void triangle(tri t, bbox bbox, MPixmap* pix, ZBuffer ZBuff, BMColor color)
       float gamma = getarea(t2) * tarea;
 
       if (alpha < 0   || beta < 0   || gamma < 0) continue;
-      uint32_t z = color;
+      int32_t z = color;
       if (color == BLACK) {
         uint8_t intensity = (uint8_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
         z = (intensity << 16) | (intensity << 8) | intensity;
       };
-      uint32_t depth = (uint32_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
-      uint32_t screen_index = y * pix->width + x;
-      if (screen_index <= pix->width * pix->height ) {
+      int32_t depth = (uint32_t)(alpha*t.v0.z  + beta*t.v1.z   + gamma*t.v2.z);
+      int32_t screen_index = y * pix->width + x;
+      if (screen_index < pix->width * pix->height && screen_index > 0 ) {
+      // if (screen_index > 0 ) {
         if ( depth > ZBuff.Buffer[screen_index]) {
           ZBuff.Buffer[screen_index] = depth;
           SetPixel(pix, x, y, z);
@@ -307,7 +316,6 @@ int32_t getarea(tri t){
 void modelrender(OBJModel model, MPixmap* pix)
 {
   ZBuffer ZBuff = ZBSet(SCREEN_WIDTH, SCREEN_HEIGHT);
-  printf("model.nface %d\n", model.nface);
   for (int i = 0; i < model.nface; i+=3) {
     vec3f pre_v0 = (vec3f){ .x = model.vertices[(model.faces[i] - 1) * 3],
                             .y = model.vertices[(model.faces[i] - 1) * 3 + 1],
@@ -330,7 +338,6 @@ void modelrender(OBJModel model, MPixmap* pix)
     vec3 v0;
     vec3 v1;
     vec3 v2;
-
     vec3f_proj(&v0, &pre_v0, pix);
     vec3f_proj(&v1, &pre_v1, pix);
     vec3f_proj(&v2, &pre_v2, pix);
@@ -338,7 +345,7 @@ void modelrender(OBJModel model, MPixmap* pix)
     tri t   = { .v0 = v0, .v1 = v1, .v2 = v2, };
     bbox bb = getbbox(t);
     uint32_t color = (rand()%255 << 16) | (rand()%255 << 8) | (rand()%255);
-    triangle(t, bb, pix, ZBuff, color); // color or BLACK
+    triangle(t, bb, pix, ZBuff, BLACK); // color or BLACK
   }
   munmap(ZBuff.Buffer, ZBuff.size);
 }
@@ -397,7 +404,8 @@ void SetPixel(MPixmap *pix, int x, int y, uint32_t color)
 {
   y += 1;
   if (x >= 0 && x < pix->width && y >= 0 && y < pix->height) {
-    pix->pixel_buffer[(pix->height-y) * pix->width + x] = color;
+    // pix->pixel_buffer[(pix->height-y) * pix->width + x] = color;
+    pix->pixel_buffer[(pix->height - y - 1) * pix->width + x] = color;
   }
 }
 
@@ -476,28 +484,42 @@ bbox model_getbbox(OBJModel *model, MPixmap *pix)
   return (bbox){ v0, v1, v2, v3 };
 }
 
+// void vec3f_rot(vec3f *vec)
+// {
+//   // float angle = 30.f * (M_PI / 180.f);
+//   // float x = vec->x;
+//   // vec->x = x * cosf(angle) + vec->z * sinf(angle);
+//   // vec->z = -x * sinf(angle) + vec->z * cosf(angle);
+//
+//   float y = vec->y;
+//   float angleY = 30.f * (M_PI / 180.f);
+//   vec->y = y * cosf(angleY) - vec->z * sinf(angleY);
+//   vec->z = y * sinf(angleY) + vec->z * cosf(angleY);
+// }
+
 void vec3f_rot(vec3f *vec)
 {
-  float angle = 30.f * (M_PI / 180.f);
-  float x = vec->x;
   float y = vec->y;
-  float z = vec->z;
-
-  vec->x = x * cosf(angle) + z * sinf(angle);
-  vec->z = x * sinf(angle) + z * cosf(angle);
-
+  vec->y = y * 1 + vec->z * 1;
+  vec->z = y * 0 + vec->z * 1;
 }
 
 void vec3f_perspec(vec3f *vec)
 {
-  // vec->x = vec->x / (1.f - vec->z/3.f );
-  // vec->y = vec->y / (1.f - vec->z/3.f );
-  // vec->z = vec->z / (1.f - vec->z/3.f );
+  float w = 1.f - (vec->z / 3.f);
+
+  vec->x = vec->x / w;
+  vec->y = vec->y / w;
+  // vec->z = vec->z / w;
 }
 
 void vec3f_proj(vec3 *vec, vec3f *pre_vec, MPixmap *pix)
 {
-  vec->x = rondo((float)pix->width/2  * (pre_vec->x + 1.f) );
-  vec->y = rondo((float)pix->height/2 * (pre_vec->y + 1.f) );
-  vec->z = rondo((float)255.f/2       * (pre_vec->z + 1.f) );
+  float scale = .7f;
+  vec->x = rondo((float)pix->width/2  * (pre_vec->x * scale + 1.f));
+  vec->y = rondo((float)pix->height/2 * (pre_vec->y * scale + 1.f));
+  vec->z = rondo((float)255.f/2       * (pre_vec->z + 1.f));
 }
+
+void vec3f_print(vec3f *vec)  { static int n = 1; printf("x: %f - y: %f - z: %f - n: %d\n", vec->x, vec->y, vec->z, n); n++; }
+void vec3_print(vec3 *vec)    { static int n = 1; printf("x: %d - y: %d - z: %d - n: %d\n", vec->x, vec->y, vec->z, n); n++; }
